@@ -1,0 +1,310 @@
+.process-btn-content .mat-progress-spinner.spinner svg {
+  stroke: #1976d2 !important;
+}
+.process-btn-content .mat-progress-spinner.spinner circle {
+  stroke: #1976d2 !important;
+  stroke-width: 4px !important;
+}
+.process-btn-content .mat-progress-spinner.spinner {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  margin-right: 6px;
+  min-width: 24px !important;
+  min-height: 24px !important;
+  width: 24px !important;
+  height: 24px !important;
+  background: none !important;
+  border-radius: 50%;
+  z-index: 2;
+}
+.schema-field.mat-form-field-disabled,
+.schema-field[disabled] {
+  opacity: 0.45 !important;
+  filter: grayscale(0.7) blur(1px);
+  pointer-events: none;
+}
+.schema-field .mat-select-panel {
+  opacity: 0.8 !important;
+  filter: grayscale(0.8) blur(0.5px);
+}
+.mat-form-field.disabled,
+.mat-form-field[disabled],
+.mat-form-field.mat-form-field-disabled {
+  opacity: 0.5 !important;
+  pointer-events: none;
+}
+.form-row .mat-form-field[disabled],
+.form-row .mat-form-field.mat-form-field-disabled {
+  opacity: 0.5 !important;
+  pointer-events: none;
+}
+.checkbox-excel {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fff;
+  border-radius: 18px;
+  padding: 10px 15px;
+  box-shadow: 0 4px 16px 0 rgba(30, 64, 175, 0.18);
+  border: 2px solid #90caf9;
+  position: relative;
+  min-width: 220px;
+}
+.checkbox-title {
+  font-weight: 700;
+  color: #000000;
+  font-size: 15px;
+  margin-left: 2px;
+  letter-spacing: 1px;
+}
+.checkbox-label {
+  font-weight: 600;
+  color: #1976d2;
+  font-size: 15px;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+  text-shadow: 0 2px 8px #90caf9;
+}
+.checkbox-label.active {
+  opacity: 1;
+  text-shadow: 0 2px 12px #1976d2;
+}
+/* src/app/app.component.scss */
+.topbar {
+  background: var(--primary);
+  color: white;
+  justify-content: center;
+  height: 48px;
+}
+.title {
+  font-weight: 600;
+  letter-spacing: 2px;
+  font-size: 18px;
+}
+
+.container {
+  display: flex;
+  gap: 32px;
+  padding: 32px 24px;
+  height: calc(100vh - 48px);
+  box-sizing: border-box;
+  background: linear-gradient(90deg, #e3f0ff 0%, #f8fbff 100%);
+}
+
+/* left card (form) */
+.left-card {
+  width: 45%;
+  max-width: 600px;
+  min-width: 400px;
+  background: #f4faff;
+  border-radius: 18px;
+  box-shadow: 0 4px 24px 0 rgba(30, 64, 175, 0.1);
+  padding: 32px 28px 24px 28px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  border: 1.5px solid #b3d1ff;
+}
+
+.form-modern {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.form-header {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 2px;
+}
+.download-btn {
+  font-weight: 500;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px 0 rgba(30, 64, 175, 0.08);
+  transition: box-shadow 0.2s;
+}
+.download-btn:hover {
+  box-shadow: 0 4px 16px 0 rgba(30, 64, 175, 0.18);
+}
+.divider {
+  height: 1.5px;
+  background: linear-gradient(90deg, #1976d2 0%, #90caf9 100%);
+  border-radius: 2px;
+  margin: 8px 0 4px 0;
+}
+.form-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.mat-form-field-appearance-fill .mat-form-field-flex {
+  background: #e3f0ff !important;
+  border-radius: 8px;
+}
+.mat-select-panel {
+  background: aliceblue !important;
+  border: 1.5px solid #b3d1ff !important;
+}
+.mat-option,
+.mat-option.mat-active,
+.mat-option.mat-selected,
+.mat-option:hover,
+.mat-option.cdk-focused,
+.mat-option.cdk-mouse-focused {
+  background: aliceblue !important;
+  font-size: 13px !important;
+  color: #1976d2 !important;
+  border-bottom: 1px solid #e3f0ff !important;
+}
+.cdk-overlay-pane {
+  background: aliceblue !important;
+}
+.toggle-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.toggle-label {
+  font-weight: 600;
+  color: #1976d2;
+  font-size: 14px;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+.toggle-label.active {
+  opacity: 1;
+}
+.inline {
+  gap: 18px;
+}
+.upload-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 6px;
+}
+.upload-btn {
+  border-radius: 8px;
+  font-weight: 500;
+  box-shadow: 0 2px 8px 0 rgba(30, 64, 175, 0.08);
+  transition: box-shadow 0.2s;
+}
+.upload-btn:hover {
+  box-shadow: 0 4px 16px 0 rgba(30, 64, 175, 0.18);
+}
+.filename {
+  font-size: 13px;
+  color: #1976d2;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.filename.error {
+  color: #c62828;
+}
+.full {
+  width: 100%;
+  min-width: 220px;
+}
+.process-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+}
+// ...existing code...
+.process-btn-bottom {
+  font-weight: 500;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px 0 rgba(30, 64, 175, 0.08);
+  transition: box-shadow 0.2s;
+  width: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.process-btn-bottom:hover {
+  box-shadow: 0 4px 16px 0 rgba(30, 64, 175, 0.18);
+}
+.process-btn-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  gap: 8px;
+}
+.process-label {
+  display: flex;
+  align-items: center;
+  height: 24px;
+}
+.process-btn-content .mat-icon {
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+}
+.process-btn-content .spinner {
+  margin-right: 4px;
+  display: flex;
+  align-items: center;
+}
+
+/* right column (logger) */
+.right {
+  flex: 1;
+  border-left: 2px solid #b3d1ff;
+  padding-left: 24px;
+  display: flex;
+  flex-direction: column;
+}
+.logger-header {
+  font-weight: 700;
+  margin-bottom: 10px;
+  color: #1976d2;
+  font-size: 16px;
+}
+.logger {
+  background: #f4faff;
+  border: 1.5px solid #b3d1ff;
+  flex: 1;
+  overflow: auto;
+  padding: 18px;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px 0 rgba(30, 64, 175, 0.06);
+}
+.log {
+  margin: 0;
+  font-family: "Fira Mono", monospace;
+  font-size: 13px;
+  color: #0b2540;
+}
+
+/* responsive */
+@media (max-width: 900px) {
+  .container {
+    flex-direction: column;
+    padding: 18px 6px;
+  }
+  .left-card {
+    width: 100%;
+    max-width: none;
+    padding: 18px 8px 12px 8px;
+  }
+  .right {
+    width: 100%;
+    padding-left: 0;
+    border-left: none;
+  }
+}
+
+.spinner {
+  margin-right: 8px;
+}
+button {
+  display: flex;
+  align-items: center;
+}
