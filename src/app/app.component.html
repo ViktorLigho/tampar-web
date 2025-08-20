@@ -179,10 +179,16 @@
       <div class="form-row">
         <mat-label>Output Mode</mat-label>
         <mat-radio-group formControlName="outputMode" [disabled]="processing">
-          <mat-radio-button value="FULL" title="Before Deployment"
+          <mat-radio-button
+            value="FULL"
+            title="Before Deployment"
+            style="margin-left: 30px"
             >Full Scan</mat-radio-button
           >
-          <mat-radio-button value="EXCEL" title="After Deployment"
+          <mat-radio-button
+            value="EXCEL"
+            title="After Deployment"
+            style="margin-left: 20px"
             >Excel Only</mat-radio-button
           >
         </mat-radio-group>

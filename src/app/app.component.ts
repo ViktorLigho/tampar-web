@@ -58,6 +58,7 @@ import { MatRadioModule } from '@angular/material/radio';
   styleUrl: './app.component.scss',
 })
 export class AppComponent implements OnInit {
+  fileBytes: Uint8Array | null = null;
   @ViewChild('chipList') chipList!: MatChipGrid;
   title = 'TAMPAR';
 
@@ -113,7 +114,10 @@ export class AppComponent implements OnInit {
   addSchema(event: any): void {
     const input = event.input;
     const value = event.value;
-
+    if (this.selectedSchemas.length == 5) {
+      this.snackBar.open('Max 5 Schema', 'OK', { duration: 1800 });
+      return;
+    }
     if ((value || '').trim()) {
       const val = value.trim().toUpperCase(); // Normalize to uppercase
       if (
@@ -140,6 +144,10 @@ export class AppComponent implements OnInit {
 
   selectSchema(event: any): void {
     const value = event.option.value;
+    if (this.selectedSchemas.length == 5) {
+      this.snackBar.open('Max 5 Schema', 'OK', { duration: 1800 });
+      return;
+    }
     if (!this.selectedSchemas.includes(value)) {
       this.selectedSchemas.push(value);
     }
@@ -209,11 +217,16 @@ export class AppComponent implements OnInit {
       return;
     }
 
-    // read file with SheetJS to validate
+    // read file and convert to Uint8Array ([]byte)
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
         const data = e.target?.result;
+        if (data instanceof ArrayBuffer) {
+          this.fileBytes = new Uint8Array(data);
+        } else {
+          throw new Error('FileReader result is not ArrayBuffer');
+        }
         const wb = XLSX.read(data, { type: 'array' });
         // optional: basic validation: sheet exists
         const sheets = wb.SheetNames;
@@ -262,6 +275,7 @@ export class AppComponent implements OnInit {
     const schema = this.form.value?.schema || [];
     const envSource = this.form.value?.envSource;
     const envTarget = this.form.value?.envTarget;
+    const outputMode = this.form.value?.outputMode;
     //const formValues = this.form.getRawValue();
     // validations
     if (!mode) {
@@ -291,6 +305,12 @@ export class AppComponent implements OnInit {
         );
         return;
       }
+      if (!this.fileBytes) {
+        this.snackBar.open('File belum dikonversi ke byte', 'OK', {
+          duration: 1800,
+        });
+        return;
+      }
     } else {
       // non-excel
       if (!schema || schema.length === 0) {
@@ -309,6 +329,9 @@ export class AppComponent implements OnInit {
       }
     }
     console.log('Form Log', this.form.value);
+    if (useExcel) {
+      console.log('File bytes:', this.fileBytes);
+    }
     // start simulated process with realtime log
     this.logClear();
 
@@ -316,10 +339,14 @@ export class AppComponent implements OnInit {
     this.processing = true;
     this.progress = 0;
     this.logAppend(
-      `[PROCESS] Mode=${mode} | useExcel=${useExcel ? 'YES' : 'NO'}`
+      `[PROCESS] Mode=${mode} | useExcel=${
+        useExcel ? 'YES' : 'NO'
+      } | OutputMode=${outputMode}`
     );
     if (useExcel)
-      this.logAppend(`[INFO] Using uploaded file: ${this.uploadedFileName}`);
+      this.logAppend(
+        `[INFO] Using uploaded file: ${this.uploadedFileName} | Bytes: ${this.fileBytes?.length}`
+      );
 
     // simulate steps using interval
     let step = 0;
@@ -390,7 +417,12 @@ export class AppComponent implements OnInit {
       this.form.get('schema')!.disable();
       this.form.get('schema')!.clearValidators();
       this.form.get('schema')?.setValue('');
+      this.form.get('outputMode')!.enable();
+      this.form.get('outputMode')?.setValidators(Validators.required);
     } else {
+      this.form.get('outputMode')!.disable();
+      this.form.get('outputMode')!.clearValidators();
+      this.form.get('outputMode')?.setValue('');
       this.form.get('schema')!.enable();
       this.form.get('schema')?.setValidators(Validators.required);
       this.schemaCtrl.enable();
