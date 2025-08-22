@@ -1,6 +1,6 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, Observable, of, switchMap } from 'rxjs';
 
 @Injectable({
   providedIn: 'root',
@@ -11,7 +11,9 @@ export class AppService {
   constructor(private _httpClient: HttpClient) {}
 
   private _getService: BehaviorSubject<any | null> = new BehaviorSubject(null);
-
+  private _processService: BehaviorSubject<any | null> = new BehaviorSubject(
+    null
+  );
   /* HEADERS */
   header: Object = {
     headers: new HttpHeaders({
@@ -21,6 +23,27 @@ export class AppService {
       'X-Content-Type-Options': 'nosniff',
       'X-Frame-Options': 'SAMEORIGIN',
       // 'Access-Control-Allow-Origin': this.url,
+      'Access-Control-Allow-Credentials': 'true',
+      'Access-Control-Allow-Header':
+        'Origin, Content-Type, X-Auth-Token, content-type',
+      'Access-Control-Allow-Methods': 'GET, POST, DELETE, PUT, OPTIONS',
+      'Strict-Transport-Security': 'max-age=31536000; includeSubdomains',
+      'Content-Security-Policy': "default-src 'self'",
+      'Expect-CT': 'max-age=7776000, enforce',
+      'X-XSS-Protection': '1; mode=block',
+      'Set-Cookie': 'key=value; SameSite=Strict; httpOnly',
+      'Referrer-Policy': 'same-origin',
+    }),
+  };
+
+  hdr: Object = {
+    headers: new HttpHeaders({
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      'No-Auth': 'True',
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'SAMEORIGIN',
+      'Access-Control-Allow-Origin': this._url,
       'Access-Control-Allow-Credentials': 'true',
       'Access-Control-Allow-Header':
         'Origin, Content-Type, X-Auth-Token, content-type',
@@ -46,5 +69,16 @@ export class AppService {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  }
+
+  process(criteria: any): Observable<any> {
+    return this._httpClient
+      .post(`${this._url}/common/process`, criteria, this.hdr)
+      .pipe(
+        switchMap((response: any) => {
+          this._processService.next(response);
+          return of(response);
+        })
+      );
   }
 }

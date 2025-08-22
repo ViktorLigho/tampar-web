@@ -32,6 +32,7 @@ import { MatChipGrid } from '@angular/material/chips';
 import { AppService } from './app.service';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { MatRadioModule } from '@angular/material/radio';
+import _ from 'lodash';
 @Component({
   selector: 'app-root',
   imports: [
@@ -90,11 +91,11 @@ export class AppComponent implements OnInit {
     this.form = this.fb.group({
       mode: ['', Validators.required],
       useExcel: [false, Validators.required],
-      uploadFile: [null, Validators.required],
       schema: [[], Validators.required], // multi-selection
       envSource: ['', Validators.required],
       envTarget: ['', Validators.required],
-      outputMode: ['FULL'],
+      outputMode: ['EXCEL'],
+      excelFile: [null],
     });
   }
 
@@ -167,11 +168,11 @@ export class AppComponent implements OnInit {
     // keep empty selections and state
     this.form.patchValue({
       useExcel: false,
-      uploadFile: null,
       schema: [],
       envSource: '',
       envTarget: '',
-      outputMode: 'FULL',
+      outputMode: 'EXCEL',
+      excelFile: null,
     });
     this.uploadedFileName = '';
     this.uploadStatus = 'idle';
@@ -205,51 +206,58 @@ export class AppComponent implements OnInit {
 
   // file input handler (native)
   onFileSelected(ev: Event) {
+    let af = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+    ];
     const input = ev.target as HTMLInputElement;
     if (!input.files || input.files.length === 0) return;
     const file = input.files[0];
     const name = file.name.toLowerCase();
-    if (!name.endsWith('.xlsx')) {
+    if (!name.endsWith('.xlsx') || !_.includes(af, file.type)) {
       this.uploadStatus = 'error';
       this.snackBar.open('Format tidak didukung — hanya .xlsx', 'OK', {
         duration: 2000,
       });
       return;
+    } else {
+      this.uploadStatus = 'success';
+      this.form.get('excelFile')!.setValue(file);
     }
 
     // read file and convert to Uint8Array ([]byte)
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = e.target?.result;
-        if (data instanceof ArrayBuffer) {
-          this.fileBytes = new Uint8Array(data);
-        } else {
-          throw new Error('FileReader result is not ArrayBuffer');
-        }
-        const wb = XLSX.read(data, { type: 'array' });
-        // optional: basic validation: sheet exists
-        const sheets = wb.SheetNames;
-        if (sheets.length === 0) throw new Error('No sheets found');
-        // success
-        this.uploadStatus = 'success';
-        this.uploadedFileName = file.name;
-        this.form.patchValue({ uploadFile: file });
-        this.snackBar.open('Upload success', 'OK', { duration: 1500 });
-        // append log
-        this.logAppend(
-          `[UPLOAD] ${file.name} loaded (${sheets.length} sheet(s))`
-        );
-      } catch (err) {
-        console.error(err);
-        this.uploadStatus = 'error';
-        this.snackBar.open('File gagal dibaca (bukan xlsx valid?)', 'OK', {
-          duration: 2000,
-        });
-        this.logAppend(`[UPLOAD-ERROR] ${file.name} - ${String(err)}`);
-      }
-    };
-    reader.readAsArrayBuffer(file);
+    // const reader = new FileReader();
+    // reader.onload = (e) => {
+    //   try {
+    //     const data = e.target?.result;
+    //     if (data instanceof ArrayBuffer) {
+    //       this.fileBytes = new Uint8Array(data);
+    //     } else {
+    //       throw new Error('FileReader result is not ArrayBuffer');
+    //     }
+    //     const wb = XLSX.read(data, { type: 'array' });
+    //     // optional: basic validation: sheet exists
+    //     const sheets = wb.SheetNames;
+    //     if (sheets.length === 0) throw new Error('No sheets found');
+    //     // success
+    //     this.uploadStatus = 'success';
+    //     this.uploadedFileName = file.name;
+    //     this.form.patchValue({ excelFile: file });
+    //     this.snackBar.open('Upload success', 'OK', { duration: 1500 });
+    //     // append log
+    //     this.logAppend(
+    //       `[UPLOAD] ${file.name} loaded (${sheets.length} sheet(s))`
+    //     );
+    //   } catch (err) {
+    //     console.error(err);
+    //     this.uploadStatus = 'error';
+    //     this.snackBar.open('File gagal dibaca (bukan xlsx valid?)', 'OK', {
+    //       duration: 2000,
+    //     });
+    //     this.logAppend(`[UPLOAD-ERROR] ${file.name} - ${String(err)}`);
+    //   }
+    // };
+    // reader.readAsArrayBuffer(file);
   }
 
   // helper to append log line
@@ -268,7 +276,7 @@ export class AppComponent implements OnInit {
   onProcess() {
     if (this.processing) return;
     // step: validation according to rules
-
+    let useExcelStr = 'N';
     this.form.get('schema')?.setValue(this.selectedSchemas);
     const mode = this.form.value?.mode;
     const useExcel = this.form.value?.useExcel;
@@ -276,6 +284,7 @@ export class AppComponent implements OnInit {
     const envSource = this.form.value?.envSource;
     const envTarget = this.form.value?.envTarget;
     const outputMode = this.form.value?.outputMode;
+    let file = this.form.get('excelFile')?.value as File;
     //const formValues = this.form.getRawValue();
     // validations
     if (!mode) {
@@ -285,7 +294,8 @@ export class AppComponent implements OnInit {
       return;
     }
     if (useExcel) {
-      if (!this.form.value.uploadFile) {
+      useExcelStr = 'Y';
+      if (!this.form.value.excelFile) {
         this.snackBar.open(
           'Upload file .xlsx terlebih dahulu saat Use Excel ON',
           'OK',
@@ -305,12 +315,12 @@ export class AppComponent implements OnInit {
         );
         return;
       }
-      if (!this.fileBytes) {
-        this.snackBar.open('File belum dikonversi ke byte', 'OK', {
-          duration: 1800,
-        });
-        return;
-      }
+      // if (!this.fileBytes) {
+      //   this.snackBar.open('File belum dikonversi ke byte', 'OK', {
+      //     duration: 1800,
+      //   });
+      //   return;
+      // }
     } else {
       // non-excel
       if (!schema || schema.length === 0) {
@@ -328,14 +338,34 @@ export class AppComponent implements OnInit {
         return;
       }
     }
-    console.log('Form Log', this.form.value);
-    if (useExcel) {
-      console.log('File bytes:', this.fileBytes);
-    }
+
+    //
+    this.handleFile(file, (result: any) => {
+      let criteria = {
+        mode: mode,
+        useExcel: useExcelStr,
+        excelFile: this.getBase64Only(result),
+        schema: schema,
+        envSource: envSource,
+        envTarget: envTarget,
+        outputMode: outputMode,
+      };
+      this.processing = true;
+      this._service.process(criteria).subscribe((response) => {
+        this.processing = false;
+        if (response?.code == 400 || response?.code == 500) {
+          this.snackBar.open('Proses Gagal: ' + response?.message, 'OK', {
+            duration: 2000,
+          });
+        } else {
+          this.snackBar.open('Proses Selesai', 'OK', { duration: 1800 });
+        }
+      });
+    });
+
     // start simulated process with realtime log
     this.logClear();
 
-    console.log('Form After Log', this.form.value);
     this.processing = true;
     this.progress = 0;
     this.logAppend(
@@ -419,6 +449,7 @@ export class AppComponent implements OnInit {
       this.form.get('schema')?.setValue('');
       this.form.get('outputMode')!.enable();
       this.form.get('outputMode')?.setValidators(Validators.required);
+      this.selectedSchemas = [];
     } else {
       this.form.get('outputMode')!.disable();
       this.form.get('outputMode')!.clearValidators();
@@ -454,5 +485,21 @@ export class AppComponent implements OnInit {
         this.form.get('envTarget')?.setValue('');
       }
     }
+  }
+
+  handleFile(file: File, onLoad: Function) {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      onLoad(reader.result);
+    };
+  }
+
+  getBase64Only(fileBase64: string): string {
+    let result = fileBase64.replace(
+      'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,',
+      ''
+    );
+    return result;
   }
 }

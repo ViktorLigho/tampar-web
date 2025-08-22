@@ -66,6 +66,7 @@
             hidden
             (change)="onFileSelected($event)"
             [disabled]="processing"
+            name="useExcel"
           />
           <div class="filename" [ngClass]="{ error: uploadStatus === 'error' }">
             <mat-icon *ngIf="uploadStatus === 'success'" color="primary"
