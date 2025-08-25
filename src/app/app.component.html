@@ -21,11 +21,7 @@
       <div class="form-row">
         <mat-form-field class="full">
           <mat-label>Mode </mat-label>
-          <mat-select
-            formControlName="mode"
-            (selectionChange)="onMode()"
-            [disabled]="processing"
-          >
+          <mat-select formControlName="mode" (selectionChange)="onMode()">
             <mat-option *ngFor="let m of modeOptions" [value]="m.value">{{
               m.label
             }}</mat-option>
@@ -69,7 +65,10 @@
             name="useExcel"
           />
           <div class="filename" [ngClass]="{ error: uploadStatus === 'error' }">
-            <mat-icon *ngIf="uploadStatus === 'success'" color="primary"
+            <mat-icon
+              *ngIf="uploadStatus === 'success'"
+              color="primary"
+              style="padding-right: 10px"
               >check_circle</mat-icon
             >
             <mat-icon *ngIf="uploadStatus === 'error'" color="warn"
@@ -87,7 +86,7 @@
             #chipList
             aria-label="Schema selection"
             [required]="!form.value.useExcel"
-            [disabled]="form.value.useExcel || processing"
+            [disabled]="form.value.useExcel"
           >
             <mat-chip
               *ngFor="let schema of selectedSchemas"
@@ -151,7 +150,6 @@
           <mat-label>Env Source</mat-label>
           <mat-select
             formControlName="envSource"
-            [disabled]="processing"
             (selectionChange)="onEnv('SOURCE')"
           >
             <mat-option *ngFor="let e of envOptions" [value]="e">{{
@@ -166,7 +164,6 @@
           <mat-label>Env Target</mat-label>
           <mat-select
             formControlName="envTarget"
-            [disabled]="processing"
             (selectionChange)="onEnv('TARGET')"
           >
             <mat-option *ngFor="let e of envOptions" [value]="e">{{
@@ -177,9 +174,12 @@
       </div>
 
       @if(form.value.mode === 'COMPARE' && form.value.useExcel) {
-      <div class="form-row">
+      <div
+        class="form-row"
+        style="flex-direction: column; align-items: flex-start"
+      >
         <mat-label>Output Mode</mat-label>
-        <mat-radio-group formControlName="outputMode" [disabled]="processing">
+        <mat-radio-group formControlName="outputMode">
           <mat-radio-button
             value="FULL"
             title="Before Deployment"
@@ -193,6 +193,16 @@
             >Excel Only</mat-radio-button
           >
         </mat-radio-group>
+        <div class="output-mode-tip">
+          <mat-icon style="font-size: 14px; vertical-align: middle"
+            >lightbulb</mat-icon
+          >
+          <small>
+            Pro Tips: Pilih <b>Full Scan</b> untuk membandingkan sebelum
+            Deployment, atau <b>Excel Only</b> untuk validasi setelah
+            Deployment.
+          </small>
+        </div>
       </div>
       }
 

@@ -8,7 +8,7 @@ import { BehaviorSubject, Observable, of, switchMap } from 'rxjs';
 export class AppService {
   public _url = 'http://localhost:6999/tampar-api';
 
-  constructor(private _httpClient: HttpClient) {}
+  constructor(private _httpClient: HttpClient) { }
 
   private _getService: BehaviorSubject<any | null> = new BehaviorSubject(null);
   private _processService: BehaviorSubject<any | null> = new BehaviorSubject(
@@ -57,8 +57,8 @@ export class AppService {
     }),
   };
 
-  getDownloadFile() {
-    this.downloadURI(`${this._url}/common/downloadTemplate`, 'Template');
+  getDownloadFile(filename: string) {
+    this.downloadURI(`${this._url}/common/downloadTemplate`, filename);
   }
 
   downloadURI(uri: string, name: string) {
@@ -71,14 +71,25 @@ export class AppService {
     document.body.removeChild(link);
   }
 
+  // process(criteria: any): Observable<any> {
+  //   return this._httpClient
+  //     .post(`${this._url}/common/process`, criteria, this.hdr)
+  //     .pipe(
+  //       switchMap((response: any) => {
+  //         this._processService.next(response);
+  //         return of(response);
+  //       })
+  //     );
+  // }
+
   process(criteria: any): Observable<any> {
-    return this._httpClient
-      .post(`${this._url}/common/process`, criteria, this.hdr)
-      .pipe(
-        switchMap((response: any) => {
-          this._processService.next(response);
-          return of(response);
-        })
-      );
+    return this._httpClient.post(`${this._url}/common/process`, criteria, {
+      ...this.hdr,
+      responseType: 'blob' as 'json',
+    });
+  }
+
+  getSchema(): Observable<any> {
+    return this._httpClient.post(`${this._url}/common/getSchema`, null, this.header);
   }
 }

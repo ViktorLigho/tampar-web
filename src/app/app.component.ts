@@ -6,7 +6,7 @@ import {
   ReactiveFormsModule,
   FormControl,
 } from '@angular/forms';
-import { BehaviorSubject, Subscription, interval, map, startWith } from 'rxjs';
+import { BehaviorSubject, Subscription, interval, lastValueFrom, map, startWith } from 'rxjs';
 import * as XLSX from 'xlsx';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { CommonModule } from '@angular/common';
@@ -68,7 +68,15 @@ export class AppComponent implements OnInit {
     { value: 'GENERATE', label: 'Generate DDL' },
     { value: 'COMPARE', label: 'Compare' },
   ];
-  schemaOptions = ['SCHEMA_A', 'SCHEMA_B', 'SCHEMA_C', 'SCHEMA_D', 'ZZX'];
+  schemaOptions = [
+    'GENERAL',
+    'PORTALUSER',
+    'PRUSER',
+    'POUSER',
+    'MSTITEM',
+    'MSTVENDOR',
+    'RFIUSER',
+  ];
   filteredSchema: string[] = [];
   envOptions = ['DEV', 'QA', 'UAT', 'SOC', 'PRODLIKE', 'PROD'];
   form: FormGroup;
@@ -79,13 +87,11 @@ export class AppComponent implements OnInit {
   log$ = new BehaviorSubject<string[]>([]);
   processing = false;
   progress = 0;
-  private procSub: Subscription | null = null;
   schemaCtrl = new FormControl<string>('', Validators.required);
 
   constructor(
     private fb: FormBuilder,
     private snackBar: MatSnackBar,
-    private ngZone: NgZone,
     private _service: AppService
   ) {
     this.form = this.fb.group({
@@ -99,7 +105,11 @@ export class AppComponent implements OnInit {
     });
   }
 
-  ngOnInit() {
+  async ngOnInit() {
+    this.logClear();
+    console.log("Log 1");
+    this.schemaOptions = await this.loadSchema()
+    console.log("Log 3");
     this.filteredSchema = this.schemaOptions.slice();
     // Setiap kali value pada input autocomplete berubah, filteredSchema akan diupdate
     this.schemaCtrl.valueChanges
@@ -117,9 +127,7 @@ export class AppComponent implements OnInit {
     const value = event.value;
     if (this.selectedSchemas.length == 5) {
       this.snackBar.open('Max 5 Schema', 'OK', { duration: 1800 });
-      return;
-    }
-    if ((value || '').trim()) {
+    } else {
       const val = value.trim().toUpperCase(); // Normalize to uppercase
       if (
         !this.selectedSchemas.includes(val) &&
@@ -133,6 +141,20 @@ export class AppComponent implements OnInit {
       input.value = '';
     }
     this.schemaCtrl.setValue('');
+    this.schemaCtrl.updateValueAndValidity();
+  }
+
+  selectSchema(event: any): void {
+    const value = event.option.value;
+    if (this.selectedSchemas.length == 5) {
+      this.snackBar.open('Max 5 Schema', 'OK', { duration: 1800 });
+    } else {
+      if (!this.selectedSchemas.includes(value)) {
+        this.selectedSchemas.push(value);
+      }
+    }
+    this.schemaCtrl.setValue('');
+    this.schemaCtrl.updateValueAndValidity();
   }
 
   removeSchema(schema: string): void {
@@ -141,18 +163,7 @@ export class AppComponent implements OnInit {
     if (index >= 0) {
       this.selectedSchemas.splice(index, 1);
     }
-  }
-
-  selectSchema(event: any): void {
-    const value = event.option.value;
-    if (this.selectedSchemas.length == 5) {
-      this.snackBar.open('Max 5 Schema', 'OK', { duration: 1800 });
-      return;
-    }
-    if (!this.selectedSchemas.includes(value)) {
-      this.selectedSchemas.push(value);
-    }
-    this.schemaCtrl.setValue('');
+    this.schemaCtrl.updateValueAndValidity();
   }
 
   private _filter(value: string | null): string[] {
@@ -200,8 +211,14 @@ export class AppComponent implements OnInit {
     // a.download = 'tampar-template.xlsx';
     // a.click();
     // URL.revokeObjectURL(url);
-    this._service.getDownloadFile();
-    this.snackBar.open('Template downloaded', 'OK', { duration: 1500 });
+    this.logAppend('Downloading Template...', 'i');
+    const filename = this.GenerateName('', '', 'TEMPLATE')
+    this._service.getDownloadFile(filename);
+    setTimeout(() => {
+      this.logAppend(`Template Downloaded: ${filename}.xlsx`, 'i');
+      this.snackBar.open('Template Downloaded', 'OK', { duration: 3500 });
+    }, 3000); // 5000 ms = 5 detik
+
   }
 
   // file input handler (native)
@@ -222,6 +239,7 @@ export class AppComponent implements OnInit {
       return;
     } else {
       this.uploadStatus = 'success';
+      this.uploadedFileName = file.name;
       this.form.get('excelFile')!.setValue(file);
     }
 
@@ -261,9 +279,17 @@ export class AppComponent implements OnInit {
   }
 
   // helper to append log line
-  logAppend(line: string) {
+  logAppend(line: string, c?: string) {
     const arr = this.log$.value.slice();
-    arr.push(`${new Date().toLocaleTimeString()}  ${line}`);
+    let sts = '';
+    if (c == 'i') {
+      sts = 'INFO';
+    } else if (c == 'w') {
+      sts = 'WARN';
+    } else {
+      sts = 'ERR!';
+    }
+    arr.push(`${new Date().toLocaleTimeString()}  [${sts}]  ${line}`);
     this.log$.next(arr);
     // auto scroll handled in template
   }
@@ -273,166 +299,199 @@ export class AppComponent implements OnInit {
   }
 
   // main "Process" button
-  onProcess() {
-    if (this.processing) return;
-    // step: validation according to rules
-    let useExcelStr = 'N';
-    this.form.get('schema')?.setValue(this.selectedSchemas);
-    const mode = this.form.value?.mode;
-    const useExcel = this.form.value?.useExcel;
-    const schema = this.form.value?.schema || [];
-    const envSource = this.form.value?.envSource;
-    const envTarget = this.form.value?.envTarget;
-    const outputMode = this.form.value?.outputMode;
-    let file = this.form.get('excelFile')?.value as File;
-    //const formValues = this.form.getRawValue();
-    // validations
-    if (!mode) {
-      this.snackBar.open('Pilih Mode terlebih dahulu', 'OK', {
-        duration: 1800,
-      });
-      return;
-    }
-    if (useExcel) {
-      useExcelStr = 'Y';
-      if (!this.form.value.excelFile) {
-        this.snackBar.open(
-          'Upload file .xlsx terlebih dahulu saat Use Excel ON',
-          'OK',
-          { duration: 2000 }
-        );
-        return;
-      }
-      if (!envSource) {
-        this.snackBar.open('Pilih Env Source', 'OK', { duration: 1800 });
-        return;
-      }
-      if (mode === 'COMPARE' && !envTarget) {
-        this.snackBar.open(
-          'Compare by Excel but Env Target wajib dipilih',
-          'OK',
-          { duration: 1800 }
-        );
-        return;
-      }
-      // if (!this.fileBytes) {
-      //   this.snackBar.open('File belum dikonversi ke byte', 'OK', {
-      //     duration: 1800,
-      //   });
-      //   return;
-      // }
-    } else {
-      // non-excel
-      if (!schema || schema.length === 0) {
-        this.snackBar.open('Pilih minimal 1 schema (non-excel)', 'OK', {
-          duration: 1800,
-        });
-        return;
-      }
-      if (!envSource && (mode === 'GENERATE' || !envTarget)) {
-        this.snackBar.open(
-          'Pilih Env Source dan Env Target (non-excel)',
-          'OK',
-          { duration: 1800 }
-        );
-        return;
-      }
-    }
+  // onProcess() {
+  //   if (this.processing) return;
+  //   // step: validation according to rules
+  //   let useExcelStr = 'N';
+  //   this.form.get('schema')?.setValue(this.selectedSchemas);
+  //   const mode = this.form.value?.mode;
+  //   const useExcel = this.form.value?.useExcel;
+  //   const schema = this.form.value?.schema || [];
+  //   const envSource = this.form.value?.envSource;
+  //   const envTarget = this.form.value?.envTarget;
+  //   const outputMode = this.form.value?.outputMode;
+  //   let file = this.form.get('excelFile')?.value as File;
+  //   //const formValues = this.form.getRawValue();
+  //   // validations
+  //   if (!mode) {
+  //     this.snackBar.open('Pilih Mode terlebih dahulu', 'OK', {
+  //       duration: 1800,
+  //     });
+  //     return;
+  //   }
+  //   if (useExcel) {
+  //     useExcelStr = 'Y';
+  //     if (!this.form.value.excelFile) {
+  //       this.snackBar.open(
+  //         'Upload file .xlsx terlebih dahulu saat Use Excel ON',
+  //         'OK',
+  //         { duration: 2000 }
+  //       );
+  //       return;
+  //     }
+  //     if (!envSource) {
+  //       this.snackBar.open('Pilih Env Source', 'OK', { duration: 1800 });
+  //       return;
+  //     }
+  //     if (mode === 'COMPARE' && !envTarget) {
+  //       this.snackBar.open(
+  //         'Compare by Excel but Env Target wajib dipilih',
+  //         'OK',
+  //         { duration: 1800 }
+  //       );
+  //       return;
+  //     }
+  //     // if (!this.fileBytes) {
+  //     //   this.snackBar.open('File belum dikonversi ke byte', 'OK', {
+  //     //     duration: 1800,
+  //     //   });
+  //     //   return;
+  //     // }
+  //   } else {
+  //     // non-excel
+  //     if (!schema || schema.length === 0) {
+  //       this.snackBar.open('Pilih minimal 1 schema (non-excel)', 'OK', {
+  //         duration: 1800,
+  //       });
+  //       return;
+  //     }
+  //     if (!envSource && (mode === 'GENERATE' || !envTarget)) {
+  //       this.snackBar.open(
+  //         'Pilih Env Source dan Env Target (non-excel)',
+  //         'OK',
+  //         { duration: 1800 }
+  //       );
+  //       return;
+  //     }
+  //   }
 
-    //
-    this.handleFile(file, (result: any) => {
-      let criteria = {
-        mode: mode,
-        useExcel: useExcelStr,
-        excelFile: this.getBase64Only(result),
-        schema: schema,
-        envSource: envSource,
-        envTarget: envTarget,
-        outputMode: outputMode,
-      };
-      this.processing = true;
-      this._service.process(criteria).subscribe((response) => {
-        this.processing = false;
-        if (response?.code == 400 || response?.code == 500) {
-          this.snackBar.open('Proses Gagal: ' + response?.message, 'OK', {
-            duration: 2000,
-          });
-        } else {
-          this.snackBar.open('Proses Selesai', 'OK', { duration: 1800 });
-        }
-      });
-    });
+  //   //
+  //   this.handleFile(file, (result: any) => {
+  //     let criteria = {
+  //       mode: mode,
+  //       useExcel: useExcelStr,
+  //       excelFile: this.getBase64Only(result),
+  //       schema: schema,
+  //       envSource: envSource,
+  //       envTarget: envTarget,
+  //       outputMode: outputMode,
+  //     };
+  //     this.processing = true;
+  //     // this._service.process(criteria).subscribe((response) => {
+  //     //   this.processing = false;
+  //     //   if (response?.code == 400 || response?.code == 500) {
+  //     //     this.snackBar.open('Proses Gagal: ' + response?.message, 'OK', {
+  //     //       duration: 2000,
+  //     //     });
+  //     //   } else {
+  //     //     this.snackBar.open('Proses Selesai', 'OK', { duration: 1800 });
+  //     //   }
+  //     // });
+  //     this._service
+  //       .process({
+  //         mode,
+  //         useExcel,
+  //         schema,
+  //         envSource,
+  //         envTarget,
+  //         outputMode,
+  //         fileBytes: this.fileBytes,
+  //       })
+  //       .subscribe({
+  //         next: (res) => {
+  //           if (res.type === 'application/zip') {
+  //             // Download file .zip
+  //             const blob = new Blob([res.body], { type: 'application/zip' });
+  //             const url = window.URL.createObjectURL(blob);
+  //             const a = document.createElement('a');
+  //             a.href = url;
+  //             a.download = 'result.zip';
+  //             a.click();
+  //             window.URL.revokeObjectURL(url);
+  //             this.snackBar.open('Download success', 'OK', { duration: 1800 });
+  //           } else if (res.message) {
+  //             // Show warning
+  //             this.snackBar.open(res.message, 'OK', { duration: 2500 });
+  //           }
+  //         },
+  //         error: (err) => {
+  //           this.snackBar.open('Proses gagal: ' + err.message, 'OK', {
+  //             duration: 2500,
+  //           });
+  //         },
+  //       });
+  //   });
 
-    // start simulated process with realtime log
-    this.logClear();
+  //   // start simulated process with realtime log
+  //   this.logClear();
 
-    this.processing = true;
-    this.progress = 0;
-    this.logAppend(
-      `[PROCESS] Mode=${mode} | useExcel=${
-        useExcel ? 'YES' : 'NO'
-      } | OutputMode=${outputMode}`
-    );
-    if (useExcel)
-      this.logAppend(
-        `[INFO] Using uploaded file: ${this.uploadedFileName} | Bytes: ${this.fileBytes?.length}`
-      );
+  //   this.processing = true;
+  //   this.progress = 0;
+  //   this.logAppend(
+  //     `[PROCESS] Mode=${mode} | useExcel=${
+  //       useExcel ? 'YES' : 'NO'
+  //     } | OutputMode=${outputMode}`
+  //   );
+  //   if (useExcel)
+  //     this.logAppend(
+  //       `[INFO] Using uploaded file: ${this.uploadedFileName} | Bytes: ${this.fileBytes?.length}`
+  //     );
 
-    // simulate steps using interval
-    let step = 0;
-    const steps: string[] = [];
-    if (mode === 'GENERATE') {
-      if (useExcel) {
-        steps.push('Read Excel list of objects');
-        steps.push('Resolve objects in Env Source');
-        steps.push('Generate DDL for each object');
-        steps.push('Prepare summary (missing objects report)');
-      } else {
-        steps.push('Resolve schemas');
-        steps.push('Collect objects for each schema');
-        steps.push('Generate DDL for objects');
-      }
-    } else {
-      // compare
-      if (useExcel) {
-        steps.push('Read Excel list of objects');
-        steps.push('Compare objects between Env Source and Env Target');
-        steps.push(
-          'Collect differences -> extract DDL for missing/changed objects'
-        );
-      } else {
-        steps.push('Resolve schemas (multi)');
-        steps.push('List objects');
-        steps.push('Compare Env Source vs Env Target');
-        steps.push('Collect DDL for differences');
-      }
-    }
-    // simulate progress with interval
-    const total = steps.length + 2;
-    this.procSub = interval(900).subscribe((i) => {
-      this.ngZone.run(() => {
-        if (step < steps.length) {
-          this.logAppend(`[STEP] ${steps[step]}`);
-        } else if (step === steps.length) {
-          this.logAppend('[STEP] Finalizing results...');
-        } else {
-          this.logAppend('[DONE] Process finished.');
-        }
-        step++;
-        this.progress = Math.min(100, Math.round((step / total) * 100));
-        if (step > total) {
-          this.processing = false;
-          this.procSub?.unsubscribe();
-          this.procSub = null;
-          // summary message (dummy)
-          this.logAppend(
-            `[SUMMARY] Found 3 differences (dummy) — DDL extracted`
-          );
-          this.snackBar.open('Process complete', 'OK', { duration: 1800 });
-        }
-      });
-    });
-  }
+  //   // simulate steps using interval
+  //   let step = 0;
+  //   const steps: string[] = [];
+  //   if (mode === 'GENERATE') {
+  //     if (useExcel) {
+  //       steps.push('Read Excel list of objects');
+  //       steps.push('Resolve objects in Env Source');
+  //       steps.push('Generate DDL for each object');
+  //       steps.push('Prepare summary (missing objects report)');
+  //     } else {
+  //       steps.push('Resolve schemas');
+  //       steps.push('Collect objects for each schema');
+  //       steps.push('Generate DDL for objects');
+  //     }
+  //   } else {
+  //     // compare
+  //     if (useExcel) {
+  //       steps.push('Read Excel list of objects');
+  //       steps.push('Compare objects between Env Source and Env Target');
+  //       steps.push(
+  //         'Collect differences -> extract DDL for missing/changed objects'
+  //       );
+  //     } else {
+  //       steps.push('Resolve schemas (multi)');
+  //       steps.push('List objects');
+  //       steps.push('Compare Env Source vs Env Target');
+  //       steps.push('Collect DDL for differences');
+  //     }
+  //   }
+  //   // simulate progress with interval
+  //   const total = steps.length + 2;
+  //   this.procSub = interval(900).subscribe((i) => {
+  //     this.ngZone.run(() => {
+  //       if (step < steps.length) {
+  //         this.logAppend(`[STEP] ${steps[step]}`);
+  //       } else if (step === steps.length) {
+  //         this.logAppend('[STEP] Finalizing results...');
+  //       } else {
+  //         this.logAppend('[DONE] Process finished.');
+  //       }
+  //       step++;
+  //       this.progress = Math.min(100, Math.round((step / total) * 100));
+  //       if (step > total) {
+  //         this.processing = false;
+  //         this.procSub?.unsubscribe();
+  //         this.procSub = null;
+  //         // summary message (dummy)
+  //         this.logAppend(
+  //           `[SUMMARY] Found 3 differences (dummy) — DDL extracted`
+  //         );
+  //         this.snackBar.open('Process complete', 'OK', { duration: 1800 });
+  //       }
+  //     });
+  //   });
+  // }
 
   // helper: whether Upload input should be shown and enabled
   shouldShowUpload() {
@@ -501,5 +560,223 @@ export class AppComponent implements OnInit {
       ''
     );
     return result;
+  }
+
+  onProcess() {
+    if (this.processing) return;
+
+    this.form.get('schema')?.setValue(this.selectedSchemas);
+    const mode = this.form.value?.mode;
+    const useExcel = this.form.value?.useExcel;
+    const schema = this.form.value?.schema || [];
+    const envSource = this.form.value?.envSource;
+    const envTarget = this.form.value?.envTarget;
+    const outputMode = this.form.value?.outputMode;
+    let file = this.form.get('excelFile')?.value as File;
+
+    // Validasi
+    if (!mode) {
+      this.logAppend(`Pilih Mode terlebih dahulu`, 'w');
+      this.snackBar.open('Pilih Mode terlebih dahulu', 'OK', {
+        duration: 1800,
+      });
+      return;
+    }
+    if (useExcel) {
+      if (!file) {
+        this.logAppend('Upload file .xlsx terlebih dahulu saat Use Excel YES', 'w');
+        this.snackBar.open(
+          'Upload file .xlsx terlebih dahulu saat Use Excel YES',
+          'OK',
+          { duration: 2000 }
+        );
+        return;
+      }
+      if (!envSource) {
+        this.logAppend('Pilih Env Source', 'w');
+        this.snackBar.open('Pilih Env Source', 'OK', { duration: 1800 });
+        return;
+      }
+      if (mode === 'COMPARE' && !envTarget) {
+        this.logAppend('Compare by Excel but Env Target wajib dipilih', 'w');
+        this.snackBar.open(
+          'Compare by Excel but Env Target wajib dipilih',
+          'OK',
+          { duration: 1800 }
+        );
+        return;
+      }
+    } else {
+      if (!schema || schema.length === 0) {
+        this.logAppend('Pilih minimal 1 schema (non-excel)', 'w');
+        this.snackBar.open('Pilih minimal 1 schema (non-excel)', 'OK', {
+          duration: 1800,
+        });
+        return;
+      }
+      if (!envSource && (mode === 'GENERATE' || !envTarget)) {
+        this.logAppend('Pilih Env Source dan Env Target (non-excel)', 'w');
+        this.snackBar.open(
+          'Pilih Env Source dan Env Target (non-excel)',
+          'OK',
+          { duration: 1800 }
+        );
+        return;
+      }
+    }
+    this.logAppend(`Processing...`, 'i');
+    this.logAppend(`Mode=${mode} | useExcel=${useExcel ? 'YES' : 'NO'} | Env=${envSource} | Env=${envTarget} | Schema=${schema}`, 'i');
+    const fileName = this.GenerateName(envSource, envTarget, mode);
+    this.logAppend(`Name Generate ${fileName}`, 'i');
+    // Konversi file ke []byte (Uint8Array)
+    if (useExcel && file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const arrayBuffer = e.target?.result as ArrayBuffer;
+        const fileBytes = new Uint8Array(arrayBuffer);
+
+        // Siapkan payload
+        const payload: any = {
+          mode,
+          useExcel: useExcel ? 'Y' : 'N',
+          schema,
+          envSource,
+          envTarget,
+          outputMode,
+          excelFile: Array.from(fileBytes), // Kirim sebagai array number
+          fileName: fileName
+        };
+
+        this.processing = true;
+        this._service.process(payload).subscribe({
+          next: (res) => {
+            this.processing = false;
+            // Jika response adalah file zip
+            if (res instanceof Blob || res.type === 'application/zip') {
+              this.logAppend('Downloading Result...', 'i');
+              const blob = new Blob([res.body || res], {
+                type: 'application/zip',
+              });
+              const url = window.URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = fileName;
+              a.click();
+              window.URL.revokeObjectURL(url);
+              this.snackBar.open('Process Success', 'OK', { duration: 2500 });
+            } else if (res?.code == 400) {
+              this.logAppend(res.message, 'w');
+              // Jika response adalah warning/message
+              this.snackBar.open('Process Complete', 'OK', { duration: 2500 });
+            } else if (res.message) {
+              this.logAppend(res.message, 'e');
+              // Jika response adalah warning/message
+              this.snackBar.open('Process Fail', 'OK', { duration: 2500 });
+            }
+          },
+          error: (err) => {
+            this.logAppend(err.message, 'e');
+            this.processing = false;
+            this.snackBar.open('Proses gagal: ' + err.message, 'OK', {
+              duration: 2500,
+            });
+          },
+        });
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      // Non-excel, kirim payload tanpa file
+      const payload: any = {
+        mode,
+        useExcel: useExcel ? 'Y' : 'N',
+        schema,
+        envSource,
+        envTarget,
+        outputMode,
+        excelFile: [],
+        fileName: fileName
+      };
+      this.processing = true;
+      this._service.process(payload).subscribe({
+        next: (res) => {
+          this.processing = false;
+          if (res instanceof Blob || res.type === 'application/zip') {
+            this.logAppend('Downloading Result...', 'i');
+            const blob = new Blob([res.body || res], {
+              type: 'application/zip',
+            });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName
+            a.click();
+            window.URL.revokeObjectURL(url);
+            this.snackBar.open('Process Success', 'OK', { duration: 1800 });
+          } else if (res?.code == 400) {
+            this.logAppend(res.message, 'w');
+            // Jika response adalah warning/message
+            this.snackBar.open('Process Complete', 'OK', { duration: 2500 });
+          } else if (res.message) {
+            this.logAppend(res.message, 'e');
+            this.snackBar.open('Process Fail', 'OK', { duration: 2500 });
+          }
+        },
+        error: (err) => {
+          this.processing = false;
+          this.logAppend(err.message, 'e');
+          this.snackBar.open('Process Fail: ' + err.message, 'OK', {
+            duration: 2500,
+          });
+        },
+      });
+    }
+  }
+
+  GenerateName(envS: string, envT: string, mode: string): string {
+    const now = new Date();
+    const pad = (n: number) => n.toString().padStart(2, '0');
+
+    const year = now.getFullYear();
+    const month = pad(now.getMonth() + 1); // getMonth() mulai dari 0
+    const day = pad(now.getDate());
+    const hour = pad(now.getHours());
+    const minute = pad(now.getMinutes());
+    const second = pad(now.getSeconds());
+    if (mode == 'GENERATE') {
+      return `Tampar-Object-DB-${envS}-${year}${month}${day}${hour}${minute}${second}.zip`;
+    } else if (mode == 'COMPARE') {
+      return `Tampar-Object-DB-${envS} To ${envT}-${year}${month}${day}${hour}${minute}${second}.zip`;
+    } else {
+      return `Template-Tampar-Object-DB-${year}${month}${day}${hour}${minute}${second}`;
+    }
+  }
+
+  loadSchema(): Promise<string[]> {
+    return new Promise<string[]>((resolve) => {
+
+      this._service.getSchema().subscribe({
+        next: (response: any) => {
+
+          // Check jika response success
+          if (response.code === 200 && response.message === 'Success') {
+            console.log("Log 2");
+            resolve(response.data || [])
+          } else {
+            resolve([])
+            this.logAppend(response.message, 'e');
+            this.snackBar.open('Process Fail: ' + response.message, 'OK', {
+              duration: 2500,
+            });
+          }
+        },
+        error: (err) => {
+          resolve([])
+          this.logAppend(err.message, 'e');
+          this.snackBar.open('Process Fail: ' + err.message, 'OK', {
+            duration: 2500,
+          });
+        }
+      });
+    });
   }
 }
